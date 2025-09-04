@@ -7,13 +7,14 @@ on:
   workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
 
 jobs:
-  check-site:
+  check-urls:
     runs-on: ubuntu-latest
-    
-    # Grant permissions to write to the repository
-    permissions:
-      contents: write
-      
+    strategy:
+      fail-fast: false # Allows other jobs to continue even if one fails
+      matrix:
+        # We are splitting the work into 4 parallel chunks
+        chunk_index: [1, 2, 3, 4]
+        
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -33,32 +34,106 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
 
-      - name: Run the bot script
-        id: bot-run
+      - name: Run the bot script for chunk ${{ matrix.chunk_index }}
+        env:
+          # This long string contains all your URLs, separated by spaces
+          ALL_URLS: "https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1720020857770001nrcJ https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1712942120293001LSc4 https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713188687975001PkXb https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1722441485393001ZFzy https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1712944582844001LZAP https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1754886602618001ip4b https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713189549333001dJUV https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713189549413001dSU4 https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713361999237001RCeP https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1748405927054001couI https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713912142591001YeKA https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1720020857878001njZu https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1716336263629001WWCH https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713188687826001P5dy https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1722441485163001Z0f4 https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713189549743001dLGN https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713188688172001PAPx https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713188688221001PBYL https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1717597285016001U6Os https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1754493196793001TMGt https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713188688480001Pktf https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713188688528001PZX4 https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1749533408322001SdGx https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1747784539000001oRmx https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1748405927235001cDQn https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1721836626068001VVzc https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713188689116001PesZ https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713361999456001Re3O https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1750881473389001gMnU https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713188689461001PWIM https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1719414268768001c7dq https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713189550555001dQJZ https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713189550644001dUTp https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713189550720001dUQC https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713188690247001Pw4B https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1714576726611001G3IM https://gracehoppercelebration.com/flow/anitab/vcf25/attendeeportal/page/exhibitor-catalog/exhibitor/1713189550799001dCWs"
+        run: |
+          # This command cleverly splits the list of all URLs into 4 chunks
+          # and gives this job its assigned piece.
+          URL_CHUNK=$(echo $ALL_URLS | tr ' ' '\n' | awk -v chunk=${{ matrix.chunk_index }} -v total=4 'NR % total == chunk % total')
+          echo "URLS_TO_CHECK=$URL_CHUNK" >> $GITHUB_ENV
+          echo "OUTPUT_FILE=active_urls_${{ matrix.chunk_index }}.txt" >> $GITHUB_ENV
+          python career_fair_bot.py
+      
+      - name: Upload active URLs as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: active-urls-${{ matrix.chunk_index }}
+          path: active_urls_${{ matrix.chunk_index }}.txt
+          if-no-files-found: ignore # Don't fail if no active URLs were found
+
+  report-results:
+    needs: check-urls
+    if: always() 
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download all active URL artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          pattern: active-urls-*
+          merge-multiple: true
+
+      - name: Consolidate results and send email
         env:
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
-        run: python career_fair_bot.py
-      
+        run: |
+          # Create an empty file to prevent errors if no artifacts are found
+          touch all_active_urls.txt
+          
+          # Combine results from all checker jobs
+          if [ -d "artifacts" ] && [ "$(ls -A artifacts)" ]; then
+            cat artifacts/*.txt | sort -u > all_active_urls.txt
+          fi
+          
+          touch sent_alerts.log
+          
+          # Find URLs that are new since the last run
+          comm -23 all_active_urls.txt sent_alerts.log > new_alerts.txt
+
+          if [ -s new_alerts.txt ]; then
+            echo "Found new active URLs to report:"
+            cat new_alerts.txt
+            
+            # Use Python to send the final email
+            pip install secure-smtplib
+            export URL_LIST=$(cat new_alerts.txt | tr '\n' ' ')
+            python -c "
+import os, smtplib
+from email.mime.text import MIMEText
+
+SENDER = os.environ.get('SENDER_EMAIL')
+PASSWORD = os.environ.get('SENDER_PASSWORD')
+RECEIVER = os.environ.get('RECEIVER_EMAIL')
+URLS = os.environ.get('URL_LIST').split()
+
+if not all([SENDER, PASSWORD, RECEIVER]):
+    print('Email credentials missing.')
+else:
+    count = len(URLS)
+    subject = f'ACTION REQUIRED: {count} Meeting Slot(s) Open at AnitaB Fair!'
+    body = 'The \\'Request meeting\\' button is now ACTIVE for the following opportunities:\\n\\n' + '\\n\\n'.join(URLS)
+    
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = SENDER
+    msg['To'] = RECEIVER
+    
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(SENDER, PASSWORD)
+            server.sendmail(SENDER, RECEIVER, msg.as_string())
+        print('Consolidated email sent successfully!')
+    except Exception as e:
+        print(f'Failed to send email: {e}')
+            "
+            
+            cat new_alerts.txt >> sent_alerts.log
+          else:
+            echo "No new alerts to send."
+          fi
+
       - name: Commit and push alert log
-        # This step will only run if the previous steps were successful
-        if: success()
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "Log new meeting alerts"
           file_pattern: sent_alerts.log
-          
-      - name: List files for debugging
-        # This step will only run if a previous step has failed
-        if: failure()
-        run: ls -la
-        
-      - name: Upload debug artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-artifacts
-          path: |
-            debug_screenshot.png
-            debug_page_source.html
