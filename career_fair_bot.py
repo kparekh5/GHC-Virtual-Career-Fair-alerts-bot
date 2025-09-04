@@ -86,7 +86,7 @@ def check_button_status(driver, url):
         except Exception as e:
             print(f"Could not dismiss cookie banner: {e}")
 
-        # --- NEW, MORE RELIABLE LOGIC ---
+        # --- MORE RELIABLE LOGIC ---
         # Instead of checking the button, we check for the text that says meetings are unavailable.
         # Its absence is our signal that the button is active.
         print("Searching for 'No available meetings...' text...")
@@ -94,7 +94,6 @@ def check_button_status(driver, url):
         
         try:
             # Use a short, 5-second timeout here. If the text exists, we'll find it quickly.
-            # If it doesn't exist, we don't want to wait the full 30 seconds.
             WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, no_meetings_text_selector)))
             
             # If the line above succeeds, the text was found, so meetings are unavailable.
@@ -141,6 +140,7 @@ if __name__ == "__main__":
         driver = webdriver.Chrome(service=service, options=chrome_options)
         driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
+        newly_active_urls = []
         for url in URLS_TO_CHECK:
             if url in sent_alerts:
                 print(f"\nSkipping {url} (alert already sent).")
@@ -149,15 +149,26 @@ if __name__ == "__main__":
             status = check_button_status(driver, url)
 
             if status == "active":
-                email_subject = "ACTION REQUIRED: Meeting Slot Open at AnitaB Fair!"
-                email_body = f"The 'Request meeting' button is now ACTIVE for a company you are tracking.\n\nGo here now: {url}"
-                send_email_alert(email_subject, email_body, RECEIVER_EMAIL)
-                save_sent_alert(url)
-                print(f"Logged {url} to prevent re-alerting.")
+                newly_active_urls.append(url)
             elif status == "error":
                 script_failed = True
                 print("An error occurred. Halting further checks to generate artifacts.")
                 break 
+
+        # After checking all URLs, send one consolidated email if any are active
+        if newly_active_urls:
+            print(f"\nFound {len(newly_active_urls)} newly active meeting opportunities.")
+            email_subject = f"ACTION REQUIRED: {len(newly_active_urls)} Meeting Slot(s) Open at AnitaB Fair!"
+            
+            links_text = "\n\n".join(newly_active_urls)
+            email_body = f"The 'Request meeting' button is now ACTIVE for the following opportunities:\n\n{links_text}"
+            
+            send_email_alert(email_subject, email_body, RECEIVER_EMAIL)
+            
+            # Log all newly sent alerts
+            for url in newly_active_urls:
+                save_sent_alert(url)
+                print(f"Logged {url} to prevent re-alerting.")
 
     except Exception as e:
         print(f"\n--- A critical error occurred during the main process ---")
