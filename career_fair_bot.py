@@ -1,5 +1,6 @@
 import os
 import smtplib
+import sys
 import time
 from email.mime.text import MIMEText
 
@@ -72,17 +73,15 @@ def save_sent_alert(url):
 def check_button_status(driver, url):
     """
     Uses an existing Selenium driver to check a single URL.
+    Returns "active", "disabled", or "error".
     """
     print(f"\n--- Checking URL: {url} ---")
-    button_is_active = False
     try:
         driver.get(url)
         wait = WebDriverWait(driver, WAIT_TIMEOUT)
 
         print("Page loaded. Searching for the primary action button...")
         
-        # --- NEW: Using a more stable CSS Selector ---
-        # This looks for a button with a 'data-testid' attribute, which is more reliable than text.
         button_selector = "button[data-testid='exhibitor-primary-action-button']"
         meeting_button = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, button_selector)))
 
@@ -90,27 +89,28 @@ def check_button_status(driver, url):
 
         if meeting_button.is_enabled():
             print("✅ SUCCESS: The 'Request meeting' button is now ACTIVE!")
-            button_is_active = True
+            return "active"
         else:
             print("❌ STATUS: The button is present, but still disabled (greyed out).")
+            return "disabled"
 
     except TimeoutException:
         print("ERROR: Timed out waiting for the button to appear. The selector might be wrong or the page didn't load correctly.")
         print("Saving debug files: debug_screenshot.png and debug_page_source.html")
-        # --- NEW: Save debugging files on failure ---
         driver.save_screenshot('debug_screenshot.png')
         with open('debug_page_source.html', 'w', encoding='utf-8') as f:
             f.write(driver.page_source)
+        return "error"
 
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
-
-    return button_is_active
+        return "error"
 
 
 if __name__ == "__main__":
     print(f"[{time.ctime()}] --- AnitaB.org Career Fair Bot (Multi-URL Run) ---")
-
+    
+    script_failed = False
     sent_alerts = load_sent_alerts()
     print(f"Loaded {len(sent_alerts)} previously sent alerts.")
 
@@ -138,22 +138,31 @@ if __name__ == "__main__":
                 print(f"\nSkipping {url} (alert already sent).")
                 continue
 
-            is_active = check_button_status(driver, url)
+            status = check_button_status(driver, url)
 
-            if is_active:
+            if status == "active":
                 email_subject = f"ACTION REQUIRED: Meeting Slot Open at AnitaB Fair!"
                 email_body = f"The 'Request meeting' button is now ACTIVE for a company you are tracking.\n\nGo here now: {url}"
                 send_email_alert(email_subject, email_body, RECEIVER_EMAIL)
                 save_sent_alert(url)
                 print(f"Logged {url} to prevent re-alerting.")
+            elif status == "error":
+                script_failed = True
+                print("An error occurred. Halting further checks.")
+                break 
 
     except Exception as e:
         print(f"\n--- A critical error occurred during the main process ---")
         print(f"Error: {e}")
+        script_failed = True
     finally:
         if driver:
             print("\nClosing browser session.")
             driver.quit()
 
     print("\n--- Run Complete ---")
+    
+    if script_failed:
+        print("\nExiting with error status to trigger artifact upload.")
+        sys.exit(1)
 
