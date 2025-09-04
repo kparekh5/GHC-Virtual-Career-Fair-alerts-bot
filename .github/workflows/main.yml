@@ -9,6 +9,11 @@ on:
 jobs:
   check-site:
     runs-on: ubuntu-latest
+    
+    # Grant permissions to write to the repository
+    permissions:
+      contents: write
+      
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
