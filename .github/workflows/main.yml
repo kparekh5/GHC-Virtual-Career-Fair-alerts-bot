@@ -103,12 +103,13 @@ from email.mime.text import MIMEText
 
 SENDER = os.environ.get('SENDER_EMAIL')
 PASSWORD = os.environ.get('SENDER_PASSWORD')
-RECEIVER = os.environ.get('RECEIVER_EMAIL')
+RECEIVER_STRING = os.environ.get('RECEIVER_EMAIL')
 URLS = os.environ.get('URL_LIST').split()
 
-if not all([SENDER, PASSWORD, RECEIVER]):
+if not all([SENDER, PASSWORD, RECEIVER_STRING]):
     print('Email credentials missing.')
 else:
+    recipients = [email.strip() for email in RECEIVER_STRING.split(',')]
     count = len(URLS)
     subject = f'ACTION REQUIRED: {count} Meeting Slot(s) Open at AnitaB Fair!'
     body = 'The \\'Request meeting\\' button is now ACTIVE for the following opportunities:\\n\\n' + '\\n\\n'.join(URLS)
@@ -116,13 +117,14 @@ else:
     msg = MIMEText(body)
     msg['Subject'] = subject
     msg['From'] = SENDER
-    msg['To'] = RECEIVER
+    msg['To'] = RECEIVER_STRING # The 'To' header shows the comma-separated list
     
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(SENDER, PASSWORD)
-            server.sendmail(SENDER, RECEIVER, msg.as_string())
-        print('Consolidated email sent successfully!')
+            # The sendmail method requires a list of recipients
+            server.sendmail(SENDER, recipients, msg.as_string())
+        print(f'Consolidated email sent successfully to: {RECEIVER_STRING}')
     except Exception as e:
         print(f'Failed to send email: {e}')
             "
