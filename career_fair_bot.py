@@ -5,7 +5,7 @@ import time
 from email.mime.text import MIMEText
 
 from selenium import webdriver
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -66,7 +66,8 @@ def save_sent_alert(url):
 
 def check_button_status(driver, url):
     """
-    Checks a single URL for the button status.
+    Checks a single URL for the "No available meetings" text.
+    If the text is missing, the button is considered active.
     Returns "active", "disabled", or "error".
     """
     print(f"\n--- Checking URL: {url} ---")
@@ -74,7 +75,7 @@ def check_button_status(driver, url):
         driver.get(url)
         wait = WebDriverWait(driver, WAIT_TIMEOUT)
 
-        # --- NEW: Handle Cookie Consent Banner ---
+        # Handle Cookie Consent Banner
         try:
             print("Looking for cookie consent banner...")
             cookie_dismiss_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".cc-btn.cc-dismiss")))
@@ -85,33 +86,29 @@ def check_button_status(driver, url):
         except Exception as e:
             print(f"Could not dismiss cookie banner: {e}")
 
-        print("Searching for the primary action button...")
+        # --- NEW, MORE RELIABLE LOGIC ---
+        # Instead of checking the button, we check for the text that says meetings are unavailable.
+        # Its absence is our signal that the button is active.
+        print("Searching for 'No available meetings...' text...")
+        no_meetings_text_selector = "//p[contains(text(),'No available meetings at this time.')]"
         
-        # --- NEW: Using the correct selector based on debug files ---
-        # This now looks for an <a> tag with the data-test attribute.
-        button_selector = "a[data-test='rf-button']"
-        meeting_button = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, button_selector)))
-
-        print("Button found. Checking its status...")
-
-        if meeting_button.is_enabled():
-            print("✅ SUCCESS: The 'Request Meeting' button is now ACTIVE!")
-            return "active"
-        else:
-            print("❌ STATUS: The button is present, but still disabled.")
+        try:
+            # Use a short, 5-second timeout here. If the text exists, we'll find it quickly.
+            # If it doesn't exist, we don't want to wait the full 30 seconds.
+            WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, no_meetings_text_selector)))
+            
+            # If the line above succeeds, the text was found, so meetings are unavailable.
+            print("❌ STATUS: 'No available meetings' text is present. Button is inactive.")
             return "disabled"
-
-    except TimeoutException:
-        print("ERROR: Timed out waiting for the button to appear.")
-        print("Saving debug files: debug_screenshot.png and debug_page_source.html")
-        driver.save_screenshot('debug_screenshot.png')
-        with open('debug_page_source.html', 'w', encoding='utf-8') as f:
-            f.write(driver.page_source)
-        return "error"
+            
+        except TimeoutException:
+            # If we time out looking for the text, it means it's GONE, which is our success condition!
+            print("✅ SUCCESS: 'No available meetings' text is NOT present. Button is likely ACTIVE!")
+            return "active"
 
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
-        # Also save debug files for unexpected errors
+        # Save debug files for any unexpected errors
         driver.save_screenshot('debug_screenshot.png')
         with open('debug_page_source.html', 'w', encoding='utf-8') as f:
             f.write(driver.page_source)
